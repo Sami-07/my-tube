@@ -1,75 +1,163 @@
-"use client"
+'use client'
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
-import { getAwsUrl } from '@/utils/get-aws-url';
+import { getAwsUrl, getThumbnailAwsUrl } from '@/utils/get-aws-url';
+import { VideoType } from '@/lib/types/video-type';
+import Image from 'next/image';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Share2, MoreHorizontal, Bell } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import '@/styles/tiptap.css'
+import { useToast } from "@/hooks/use-toast"
+import dynamic from 'next/dynamic'
+const RenderDescription = dynamic(() => import('./render-description'), { ssr: false });
+    
+export default function YouTubeStylePlayer({ video, thumbnailUrl, creatorData }: { video: VideoType, thumbnailUrl: string, creatorData: any }) {
+    const { toast } = useToast();
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isSubscribed, setIsSubscribed] = useState(false);
+    const [qualities, setQualities] = useState<{ value: string; label: string }[]>([]);
+    const [currentQuality, setCurrentQuality] = useState<string>('0');
+    const [hls, setHls] = useState<Hls | null>(null);
 
-export default function RenderVideo({ videoKey }: { videoKey: string }) {
-    const videoRef = useRef(null);
-    const qualitySelectorRef = useRef(null);
-
+    console.log("description", video.description)
 
     useEffect(() => {
         const fetchAndRenderVideo = async () => {
-            const video: any = videoRef.current;
-            console.log("video", video)
-            if (!video) return
-            const qualitySelector: any = qualitySelectorRef.current;
-            if (!qualitySelector) return
-            const manifestKey = `master-${videoKey}.m3u8`
+            const videoElement = videoRef.current;
+            if (!videoElement) return;
+
+            const manifestKey = `master-${video.videoKey}.m3u8`
             const videoSrc = await getAwsUrl(manifestKey);
-            if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                // If HLS is natively supported (Safari, iOS)
-                video.src = videoSrc.src;
-            }
-            else if (Hls.isSupported()) {
-                // If HLS is not natively supported, use hls.js
-                const hls = new Hls();
-                hls.loadSource(videoSrc.src);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
 
+            if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+                videoElement.src = videoSrc.src;
+            } else if (Hls.isSupported()) {
+                const hlsInstance = new Hls();
+                hlsInstance.loadSource(videoSrc.src);
+                hlsInstance.attachMedia(videoElement);
+
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    const availableQualities = hlsInstance.levels.map((level, index) => ({
+                        value: index.toString(),
+                        label: `${level.height}p`
+                    }));
+                    console.log("availableQualities", availableQualities)
+                    console.log("HLS", hlsInstance)
+                    setQualities(availableQualities);
                 });
 
-                // Listen for changes in the quality selector
-                qualitySelector.addEventListener('change', (event: any) => {
-                    const selectedQuality = parseInt(event.target.value, 10);
-                    hls.currentLevel = selectedQuality;
-                });
-
-                // Log the resolution of each segment as it is loaded
-                hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
-                    const level = hls.levels[data.frag.level];
-                    console.log(`Loaded segment at resolution: ${level.width}x${level.height}`);
-                });
+                setHls(hlsInstance);
 
                 return () => {
-                    hls.destroy();
+                    hlsInstance.destroy();
                 };
-            }
-            else {
+            } else {
                 console.error('HLS is not supported in this browser.');
             }
         };
 
         fetchAndRenderVideo();
-    }, [])
+    }, [video.videoKey]);
+
+    const handleQualityChange = (quality: string) => {
+        setCurrentQuality(quality);
+        if (hls) {
+            hls.currentLevel = quality === 'auto' ? -1 : parseInt(quality, 10);
+        }
+    };
+
+    const handleSubscribe = () => {
+        setIsSubscribed(!isSubscribed);
+        // Here you would typically make an API call to update the subscription status
+    };
 
     return (
-        <div>
-            {/* Video element for the HLS stream */}
-            <video ref={videoRef} controls autoPlay width="600"></video>
+        <div className="max-w-4xl mx-auto mt-8">
+            <div className="relative pt-[56.25%]">
+                <video
+                    ref={videoRef}
+                    controls
+                    className="absolute top-0 left-0 w-full h-full"
+                    poster={thumbnailUrl}
+                ></video>
+            </div>
 
-            {/* Dropdown for selecting video quality */}
-            <select ref={qualitySelectorRef} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '16px', cursor: 'pointer', color: 'black' }}>
-                <option value="0">360p</option>
-                <option value="1">480p</option>
-                <option value="2">720p</option>
-                {/* Add more options if there are more quality levels */}
-            </select>
+            <div className="mt-4">
+                <h1 className="text-2xl font-bold">{video.title}</h1>
+                <div className="flex justify-between items-center mt-2">
+                    <div className="flex items-center space-x-4">
+                        <Avatar>
+                            <AvatarImage src={creatorData.imageUrl} />
+                            <AvatarFallback>{creatorData.fullName[0]}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-semibold">{creatorData.fullName}</p>
+                            <p className="text-sm text-gray-500">
+                                {new Date(video.createdAt).toLocaleDateString()}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-2 text-black">
+                        <Button 
+                            variant={isSubscribed ? "secondary" : "default"}
+                            className={`${isSubscribed ? "bg-gray-200" : "bg-red-500"}`}
+                            size="sm"
+                            onClick={handleSubscribe}
+                        >
+                            {isSubscribed ? (
+                                <>
+                                    <Bell className="mr-2 h-4 w-4" /> Subscribed
+                                </>
+                            ) : (
+                                'Subscribe'
+                            )}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => {
+                            navigator.clipboard.writeText(window.location.href);
+                            toast({
+                                title: 'URL copied to clipboard!',
+                                description: 'You can now share the link to of this video with your friends!',
+                            });
+                        }}>
+                            <Share2 className="mr-2 h-4 w-4" /> Share
+                        </Button>
+                       
+                    </div>
+                </div>
+            </div>
 
-            {/* Include HLS.js library */}
-            <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+            <Card className="mt-4">
+                <CardContent className="pt-4">
+                    <div className="flex justify-between items-center mb-2">
+                        <p className="font-semibold">Description</p>
+                        <Select value={currentQuality} onValueChange={handleQualityChange}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Select quality" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {qualities.map((quality) => (
+                                    <SelectItem key={quality.value} value={quality.value}>
+                                        {quality.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <RenderDescription description={video.description} />   
+                </CardContent>
+            </Card>
         </div>
     );
 };
+

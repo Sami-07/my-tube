@@ -25,3 +25,10 @@ export const getAwsUrl = async (key: string) => {
     throw new Error(err.message);
   }
 }
+
+export const getThumbnailAwsUrl = async (key: string) => {
+  const command = new GetObjectCommand({ Bucket: process.env.AWS_THUMBNAIL_BUCKET_NAME, Key: key });
+  const src = await getSignedUrl(s3Client, command);
+  console.log("src in thumbnail aws", src)
+  return { src };
+}

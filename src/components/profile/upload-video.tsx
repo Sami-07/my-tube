@@ -21,6 +21,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useMutation } from '@tanstack/react-query'
 import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
+import '@/styles/tiptap.css'
 type FileWithPreview = File & {
     preview?: string;
 }
@@ -190,7 +191,7 @@ export default function UploadVideo() {
                                     placeholder="Enter video title"
                                 />
                             </div>
-                            <div>
+                            <div className='description-content'>
                                 <Label htmlFor="description">Description</Label>
                                 <Tiptap
                                     description={formData.description}

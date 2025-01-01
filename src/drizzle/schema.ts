@@ -24,7 +24,7 @@ export const Video = pgTable("video", {
     id: varchar("id").primaryKey(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     title: varchar("title", { length: 256 }).notNull(),
-    description: varchar("description", { length: 256 }).notNull(),
+    description: varchar("description").notNull().default(""),
     videoKey: varchar("video_key", { length: 256 }).notNull(),
     thumbnailKey: varchar("thumbnail_key", { length: 256 }).notNull(),
     userId: varchar("user_id").references(() => User.id),
@@ -36,3 +36,4 @@ export const VideoView = pgTable("video_view", {
     videoId: varchar("video_id").references(() => Video.id),
     userId: varchar("user_id").references(() => User.id),
 });
+
