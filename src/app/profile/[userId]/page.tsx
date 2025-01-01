@@ -1,11 +1,10 @@
-import React from 'react'
-
-export default async function page({params} : {params: {userId: string}}) {
-    const {userId} = await params;
+import ProfilePage from "@/components/profile/profile-page";
+export default async function Page({ params }: { params: { userId: string } }) {
+  const { userId } = await params;
+  if (!userId) return <div>User not found</div>
   return (
     <div>
-        <h1>Profile</h1>
-        <p>{userId}</p>
+      <ProfilePage userId={userId} />
     </div>
   )
 }
